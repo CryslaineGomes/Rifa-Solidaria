@@ -1,123 +1,315 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Rifa 1 a 100</title>
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
-    padding: 20px;
-    text-align: center;
+  :root{
+    --verde:#4caf50;
+    --vermelho:#e53935;
+    --bg:#f7f7f7;
+    --card:#ffffff;
   }
-  h1 {
-    margin-bottom: 20px;
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, Arial, sans-serif;
+    background:var(--bg);
+    color:#222;
+    padding:20px;
+    display:flex;
+    justify-content:center;
   }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    gap: 10px;
-    max-width: 500px;
-    margin: auto;
+
+  .wrap{
+    width:100%;
+    max-width:820px;
   }
-  .num {
-    padding: 15px;
-    border-radius: 8px;
-    background: #4caf50;
-    color: #fff;
-    font-weight: bold;
-    cursor: pointer;
-    transition: 0.3s;
+
+  h1{
+    text-align:center;
+    margin:6px 0 14px 0;
+    font-size:20px;
   }
-  .num.vendido {
-    background: #e53935;
-    cursor: not-allowed;
+
+  /* grid */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(10,1fr);
+    gap:10px;
+    background:transparent;
+    padding:6px;
+    margin:auto;
   }
-  #formBox {
-    margin-top: 20px;
-    background: #fff;
-    padding: 20px;
-    border-radius: 10px;
-    width: 300px;
-    margin-left: auto;
-    margin-right: auto;
-    display: none;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+
+  @media(max-width:700px){
+    .grid{grid-template-columns:repeat(6,1fr)}
   }
-  input {
-    width: 100%;
-    padding: 10px;
-    margin: 8px 0;
-    border-radius: 6px;
-    border: 1px solid #ccc;
+  @media(max-width:420px){
+    .grid{grid-template-columns:repeat(5,1fr)}
   }
-  button {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    border-radius: 6px;
-    background: #1976d2;
-    color: #fff;
-    font-size: 16px;
-    cursor: pointer;
+
+  .num{
+    background:var(--verde);
+    color:#fff;
+    min-height:52px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    transition:transform .12s, box-shadow .12s;
+    padding:8px;
+    text-align:center;
+    user-select:none;
   }
+  .num:hover{ transform:translateY(-3px) }
+
+  .num.vendido{
+    background:var(--vermelho);
+    cursor:pointer;
+    opacity:0.96;
+  }
+
+  /* area de ações */
+  .actions-row{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+  .btn{
+    padding:10px 14px;
+    border-radius:8px;
+    border:0;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .btn-export{ background:#2e7d32; color:#fff; }
+  .btn-clear{ background:#777; color:#fff; }
+
+  /* modals */
+  .overlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.45);
+    z-index:999;
+    padding:20px;
+  }
+  .card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border-radius:10px;
+    padding:16px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.12);
+    text-align:center;
+  }
+  .card h3{ margin:0 0 8px 0 }
+  input{
+    width:100%;
+    padding:10px;
+    margin:8px 0;
+    border-radius:8px;
+    border:1px solid #ddd;
+    font-size:14px;
+  }
+  .row{ display:flex; gap:8px; justify-content:center; margin-top:10px; }
+  .small-btn{ padding:8px 10px; border-radius:8px; border:0; cursor:pointer; font-weight:600 }
+
+  /* tooltip small */
+  .note{ font-size:13px; color:#555; text-align:center; margin-top:8px }
 </style>
 </head>
 <body>
-  <h1>Rifa 1 a 100</h1>
-  <div class="grid" id="grid"></div>
+  <div class="wrap">
+    <h1>Rifa 1 a 100</h1>
 
-  <div id="formBox">
-    <h3 id="formTitle"></h3>
-    <input type="text" id="nome" placeholder="Nome" />
-    <input type="text" id="telefone" placeholder="Telefone" />
-    <button onclick="confirmarCompra()">Confirmar</button>
+    <div id="grid" class="grid" aria-label="Números da rifa"></div>
+
+    <div class="actions-row">
+      <button class="btn btn-export" id="btnExport">Exportar para Excel (CSV)</button>
+      <button class="btn btn-clear" id="btnLimpar">Limpar todos (apagar)</button>
+    </div>
+
+    <p class="note">Clique em um número verde para cadastrar. Clique em um número vermelho para ver o comprador.</p>
+  </div>
+
+  <!-- Modal cadastro (verde) -->
+  <div id="modalCadastro" class="overlay" role="dialog" aria-modal="true">
+    <div class="card" style="border-left:6px solid var(--verde)">
+      <h3 id="tituloCadastro" style="color:var(--verde)"></h3>
+      <input id="inputNome" type="text" placeholder="Nome do comprador" />
+      <input id="inputTel" type="text" placeholder="Telefone" />
+      <div class="row">
+        <button class="small-btn" id="confirmBtn" style="background:var(--verde); color:#fff">Confirmar</button>
+        <button class="small-btn" id="cancelBtn" style="background:#ddd">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal mostrar comprador (vermelho) -->
+  <div id="modalShow" class="overlay" role="dialog" aria-modal="true">
+    <div class="card" style="border-left:6px solid var(--vermelho)">
+      <h3 style="color:var(--vermelho)">Número Vendido</h3>
+      <div id="infoShow" style="font-size:15px;color:#333;margin-top:6px;text-align:left"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="small-btn" id="closeShow" style="background:#ccc">Fechar</button>
+      </div>
+    </div>
   </div>
 
 <script>
-  let vendidos = JSON.parse(localStorage.getItem('vendidos')) || {}; // carregar salvos
-  let numeroSelecionado = null;
+/*
+  Versão limpa e independente.
+  - Salva em localStorage chave: 'rifa_vendidos'
+  - Ao clicar num vendido (vermelho) abre modal com Nome e Telefone
+  - Botão Exportar gera CSV (delimitador ';' para Excel BR)
+  - Botão Limpar apaga tudo (com confirmação)
+*/
 
-  const grid = document.getElementById('grid');
-  for (let i = 1; i <= 100; i++) {
-    const div = document.createElement('div');
-    div.className = 'num';
-    div.id = 'num-' + i;
-    div.innerText = i;
-    if (vendidos[i]) div.classList.add('vendido');
-    if (!vendidos[i]) div.onclick = () => selecionarNumero(i);
-    grid.appendChild(div);
-  }
+const STORAGE_KEY = 'rifa_vendidos';
 
-  function selecionarNumero(n) {
-    if (vendidos[n]) return;
-    numeroSelecionado = n;
-    document.getElementById('formTitle').innerText = `Comprar número ${n}`;
-    document.getElementById('formBox').style.display = 'block';
-  }
+// carrega ou cria objeto
+let vendidos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
-  function confirmarCompra() {
-    const nome = document.getElementById('nome').value;
-    const telefone = document.getElementById('telefone').value;
+// referências DOM
+const grid = document.getElementById('grid');
+const modalCadastro = document.getElementById('modalCadastro');
+const modalShow = document.getElementById('modalShow');
+const tituloCadastro = document.getElementById('tituloCadastro');
+const inputNome = document.getElementById('inputNome');
+const inputTel = document.getElementById('inputTel');
+const confirmBtn = document.getElementById('confirmBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+const infoShow = document.getElementById('infoShow');
+const closeShow = document.getElementById('closeShow');
+const btnExport = document.getElementById('btnExport');
+const btnLimpar = document.getElementById('btnLimpar');
 
-    if (!nome || !telefone) {
-      alert('Preencha os dados!');
-      return;
+let numeroAtivo = null;
+
+// constrói grade 1..100
+function construirGrid(){
+  grid.innerHTML = '';
+  for(let i=1;i<=100;i++){
+    const el = document.createElement('div');
+    el.className = 'num';
+    el.id = 'num-'+i;
+    el.dataset.num = i;
+    el.innerText = i;
+    // evita corte: já estilado com min-height e padding
+    if(vendidos[i]){
+      el.classList.add('vendido');
+      el.title = 'Vendido para: ' + (vendidos[i].nome || '');
+      el.addEventListener('click', ()=> abrirModalShow(i));
+    } else {
+      el.addEventListener('click', ()=> abrirModalCadastro(i));
     }
-
-    vendidos[numeroSelecionado] = { nome, telefone };
-
-    localStorage.setItem('vendidos', JSON.stringify(vendidos)); // salva
-
-    const div = document.getElementById('num-' + numeroSelecionado);
-    div.classList.add('vendido');
-    div.onclick = null;
-
-    document.getElementById('nome').value = '';
-    document.getElementById('telefone').value = '';
-    document.getElementById('formBox').style.display = 'none';
+    grid.appendChild(el);
   }
+}
+
+// abrir modal para cadastrar
+function abrirModalCadastro(n){
+  numeroAtivo = n;
+  tituloCadastro.innerText = 'Comprar número ' + n;
+  inputNome.value = '';
+  inputTel.value = '';
+  modalCadastro.style.display = 'flex';
+  inputNome.focus();
+}
+
+// confirmar compra
+confirmBtn.addEventListener('click', ()=>{
+  const nome = inputNome.value.trim();
+  const tel = inputTel.value.trim();
+  if(!nome || !tel){
+    alert('Preencha nome e telefone.');
+    return;
+  }
+  vendidos[numeroAtivo] = { nome: nome, telefone: tel };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(vendidos));
+  construirGrid();
+  modalCadastro.style.display = 'none';
+});
+
+// cancelar cadastro
+cancelBtn.addEventListener('click', ()=> {
+  modalCadastro.style.display = 'none';
+});
+
+// mostrar comprador (modal vermelho)
+function abrirModalShow(n){
+  const info = vendidos[n];
+  if(!info){
+    alert('Nenhum comprador encontrado para este número.');
+    return;
+  }
+  infoShow.innerHTML = `<strong>Número:</strong> ${n}<br><strong>Nome:</strong> ${sanitize(info.nome)}<br><strong>Telefone:</strong> ${sanitize(info.telefone)}`;
+  modalShow.style.display = 'flex';
+}
+
+// fechar modal mostrar
+closeShow.addEventListener('click', ()=> {
+  modalShow.style.display = 'none';
+});
+
+// exportar para CSV (Excel)
+btnExport.addEventListener('click', ()=> {
+  const keys = Object.keys(vendidos);
+  if(keys.length===0){
+    alert('Nenhum número vendido para exportar.');
+    return;
+  }
+  // ordenar por número
+  const nums = keys.map(k=>parseInt(k)).sort((a,b)=>a-b);
+  let csv = 'Número;Nome;Telefone\\n';
+  for(const n of nums){
+    const info = vendidos[n];
+    const nome = (info.nome || '').replace(/;/g,',').replace(/\\n/g,' ');
+    const tel  = (info.telefone || '').replace(/;/g,',').replace(/\\n/g,' ');
+    csv += `${n};${nome};${tel}\\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rifa_vendidos.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// limpar tudo (com confirmação)
+btnLimpar.addEventListener('click', ()=>{
+  if(!confirm('Tem certeza que deseja apagar todos os registros salvos? Essa ação não pode ser desfeita.')) return;
+  vendidos = {};
+  localStorage.removeItem(STORAGE_KEY);
+  construirGrid();
+});
+
+// util sanitize (simples)
+function sanitize(txt){
+  if(!txt) return '';
+  return txt.toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// fechar modals clicando fora do card
+modalCadastro.addEventListener('click', (e)=>{ if(e.target===modalCadastro) modalCadastro.style.display='none'; });
+modalShow.addEventListener('click', (e)=>{ if(e.target===modalShow) modalShow.style.display='none'; });
+
+// inicializa
+construirGrid();
+
 </script>
 </body>
 </html>
