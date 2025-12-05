@@ -4,10 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Rifa 1 a 100</title>
-
-<!-- SheetJS para exportar XLSX -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 <style>
   :root{
     --verde:#4caf50;
@@ -37,11 +33,14 @@
     font-size:20px;
   }
 
+  /* grid */
   .grid{
     display:grid;
     grid-template-columns:repeat(10,1fr);
     gap:10px;
+    background:transparent;
     padding:6px;
+    margin:auto;
   }
 
   @media(max-width:700px){
@@ -61,14 +60,21 @@
     border-radius:10px;
     font-weight:700;
     cursor:pointer;
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+    transition:transform .12s, box-shadow .12s;
     padding:8px;
     text-align:center;
     user-select:none;
   }
+  .num:hover{ transform:translateY(-3px) }
+
   .num.vendido{
     background:var(--vermelho);
+    cursor:pointer;
+    opacity:0.96;
   }
 
+  /* area de ações */
   .actions-row{
     display:flex;
     gap:10px;
@@ -84,106 +90,177 @@
     font-weight:600;
   }
   .btn-export{ background:#2e7d32; color:#fff; }
+  .btn-clear{ background:#777; color:#fff; }
 
+  /* modals */
+  .overlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.45);
+    z-index:999;
+    padding:20px;
+  }
+  .card{
+    width:100%;
+    max-width:360px;
+    background:var(--card);
+    border-radius:10px;
+    padding:16px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.12);
+    text-align:center;
+  }
+  .card h3{ margin:0 0 8px 0 }
+  input{
+    width:100%;
+    padding:10px;
+    margin:8px 0;
+    border-radius:8px;
+    border:1px solid #ddd;
+    font-size:14px;
+  }
+  .row{ display:flex; gap:8px; justify-content:center; margin-top:10px; }
+  .small-btn{ padding:8px 10px; border-radius:8px; border:0; cursor:pointer; font-weight:600 }
+
+  /* tooltip small */
+  .note{ font-size:13px; color:#555; text-align:center; margin-top:8px }
 </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Rifa 1 a 100</h1>
 
-    <div id="grid" class="grid"></div>
+    <div id="grid" class="grid" aria-label="Números da rifa"></div>
 
     <div class="actions-row">
-      <button class="btn btn-export" id="btnExport">Exportar XLSX</button>
+      <button class="btn btn-export" id="btnExport">Exportar para Excel (CSV)</button>
+      <button class="btn btn-clear" id="btnLimpar">Limpar todos (apagar)</button>
     </div>
+
+    <p class="note">Clique em um número verde para cadastrar. Clique em um número vermelho para ver o comprador.</p>
   </div>
 
-  <!-- Modal cadastro -->
-  <div id="modalCadastro" class="overlay" style="display:none">
-    <div class="card" style="border-left:6px solid var(--verde);padding:16px">
+  <!-- Modal cadastro (verde) -->
+  <div id="modalCadastro" class="overlay" role="dialog" aria-modal="true">
+    <div class="card" style="border-left:6px solid var(--verde)">
       <h3 id="tituloCadastro" style="color:var(--verde)"></h3>
-      <input id="inputNome" type="text" placeholder="Nome" style="width:100%;padding:10px;margin-top:8px">
-      <input id="inputTel" type="text" placeholder="Telefone" style="width:100%;padding:10px;margin-top:8px">
-      <div style="margin-top:12px;text-align:center">
-        <button id="confirmBtn" class="btn" style="background:var(--verde);color:#fff">Confirmar</button>
-        <button id="cancelBtn" class="btn" style="background:#ccc">Cancelar</button>
+      <input id="inputNome" type="text" placeholder="Nome do comprador" />
+      <input id="inputTel" type="text" placeholder="Telefone" />
+      <div class="row">
+        <button class="small-btn" id="confirmBtn" style="background:var(--verde); color:#fff">Confirmar</button>
+        <button class="small-btn" id="cancelBtn" style="background:#ddd">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal mostrar comprador -->
-  <div id="modalShow" class="overlay" style="display:none">
-    <div class="card" style="border-left:6px solid var(--vermelho);padding:16px">
+  <!-- Modal mostrar comprador (vermelho) -->
+  <div id="modalShow" class="overlay" role="dialog" aria-modal="true">
+    <div class="card" style="border-left:6px solid var(--vermelho)">
       <h3 style="color:var(--vermelho)">Número Vendido</h3>
-      <div id="infoShow" style="margin-top:10px;font-size:15px"></div>
-      <div style="margin-top:12px;text-align:center">
-        <button id="closeShow" class="btn" style="background:#ccc">Fechar</button>
+      <div id="infoShow" style="font-size:15px;color:#333;margin-top:6px;text-align:left"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="small-btn" id="closeShow" style="background:#ccc">Fechar</button>
       </div>
     </div>
   </div>
 
 <script>
+/*
+  Versão limpa e independente.
+  - Salva em localStorage chave: 'rifa_vendidos'
+  - Ao clicar num vendido (vermelho) abre modal com Nome e Telefone
+  - Botão Exportar gera CSV (delimitador ';' para Excel BR)
+  - Botão Limpar apaga tudo (com confirmação)
+*/
+
 const STORAGE_KEY = 'rifa_vendidos';
+
+// carrega ou cria objeto
 let vendidos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
+// referências DOM
 const grid = document.getElementById('grid');
 const modalCadastro = document.getElementById('modalCadastro');
 const modalShow = document.getElementById('modalShow');
+const tituloCadastro = document.getElementById('tituloCadastro');
 const inputNome = document.getElementById('inputNome');
 const inputTel = document.getElementById('inputTel');
-const tituloCadastro = document.getElementById('tituloCadastro');
+const confirmBtn = document.getElementById('confirmBtn');
+const cancelBtn = document.getElementById('cancelBtn');
 const infoShow = document.getElementById('infoShow');
+const closeShow = document.getElementById('closeShow');
+const btnExport = document.getElementById('btnExport');
+const btnLimpar = document.getElementById('btnLimpar');
+
 let numeroAtivo = null;
 
-// Criar grid
-function montar(){
+// constrói grade 1..100
+function construirGrid(){
   grid.innerHTML = '';
   for(let i=1;i<=100;i++){
-    const d = document.createElement('div');
-    d.className = 'num';
-    d.innerText = i;
-    if(vendidos[i]) d.classList.add('vendido');
-
-    d.onclick = ()=> {
-      if(vendidos[i]) mostrar(i);
-      else cadastrar(i);
-    };
-
-    grid.appendChild(d);
+    const el = document.createElement('div');
+    el.className = 'num';
+    el.id = 'num-'+i;
+    el.dataset.num = i;
+    el.innerText = i;
+    // evita corte: já estilado com min-height e padding
+    if(vendidos[i]){
+      el.classList.add('vendido');
+      el.title = 'Vendido para: ' + (vendidos[i].nome || '');
+      el.addEventListener('click', ()=> abrirModalShow(i));
+    } else {
+      el.addEventListener('click', ()=> abrirModalCadastro(i));
+    }
+    grid.appendChild(el);
   }
 }
 
-function cadastrar(n){
+// abrir modal para cadastrar
+function abrirModalCadastro(n){
   numeroAtivo = n;
-  tituloCadastro.innerText = "Comprar número " + n;
-  inputNome.value = "";
-  inputTel.value = "";
-  modalCadastro.style.display = "flex";
+  tituloCadastro.innerText = 'Comprar número ' + n;
+  inputNome.value = '';
+  inputTel.value = '';
+  modalCadastro.style.display = 'flex';
+  inputNome.focus();
 }
 
-document.getElementById('confirmBtn').onclick = ()=>{
-  vendidos[numeroAtivo] = {
-    nome: inputNome.value.trim(),
-    telefone: inputTel.value.trim()
-  };
+// confirmar compra
+confirmBtn.addEventListener('click', ()=>{
+  const nome = inputNome.value.trim();
+  const tel = inputTel.value.trim();
+  if(!nome || !tel){
+    alert('Preencha nome e telefone.');
+    return;
+  }
+  vendidos[numeroAtivo] = { nome: nome, telefone: tel };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(vendidos));
-  modalCadastro.style.display = "none";
-  montar();
-};
+  construirGrid();
+  modalCadastro.style.display = 'none';
+});
 
-document.getElementById('cancelBtn').onclick = ()=> modalCadastro.style.display="none";
+// cancelar cadastro
+cancelBtn.addEventListener('click', ()=> {
+  modalCadastro.style.display = 'none';
+});
 
-function mostrar(n){
-  let d = vendidos[n];
-  infoShow.innerHTML = `
-    <b>Número:</b> ${n}<br>
-    <b>Nome:</b> ${d.nome}<br>
-    <b>Telefone:</b> ${d.telefone}
-  `;
-  modalShow.style.display = "flex";
+// mostrar comprador (modal vermelho)
+function abrirModalShow(n){
+  const info = vendidos[n];
+  if(!info){
+    alert('Nenhum comprador encontrado para este número.');
+    return;
+  }
+  infoShow.innerHTML = `<strong>Número:</strong> ${n}<br><strong>Nome:</strong> ${sanitize(info.nome)}<br><strong>Telefone:</strong> ${sanitize(info.telefone)}`;
+  modalShow.style.display = 'flex';
 }
 
-document.getElementById('closeShow').onclick = ()=> modalShow.style.display="none";
+// fechar modal mostrar
+closeShow.addEventListener('click', ()=> {
+  modalShow.style.display = 'none';
+});
 
 /* ========= EXPORTAR XLSX BONITINHO ========= */
 document.getElementById("btnExport").onclick = function() {
@@ -202,7 +279,47 @@ document.getElementById("btnExport").onclick = function() {
   XLSX.writeFile(wb, "rifa.xlsx");
 };
 
-montar();
+  // ordenar por número
+  const nums = keys.map(k=>parseInt(k)).sort((a,b)=>a-b);
+  let csv = 'Número;Nome;Telefone\\n';
+  for(const n of nums){
+    const info = vendidos[n];
+    const nome = (info.nome || '').replace(/;/g,',').replace(/\\n/g,' ');
+    const tel  = (info.telefone || '').replace(/;/g,',').replace(/\\n/g,' ');
+    csv += `${n};${nome};${tel}\\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rifa_vendidos.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// limpar tudo (com confirmação)
+btnLimpar.addEventListener('click', ()=>{
+  if(!confirm('Tem certeza que deseja apagar todos os registros salvos? Essa ação não pode ser desfeita.')) return;
+  vendidos = {};
+  localStorage.removeItem(STORAGE_KEY);
+  construirGrid();
+});
+
+// util sanitize (simples)
+function sanitize(txt){
+  if(!txt) return '';
+  return txt.toString().replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// fechar modals clicando fora do card
+modalCadastro.addEventListener('click', (e)=>{ if(e.target===modalCadastro) modalCadastro.style.display='none'; });
+modalShow.addEventListener('click', (e)=>{ if(e.target===modalShow) modalShow.style.display='none'; });
+
+// inicializa
+construirGrid();
+
 </script>
 </body>
 </html>
