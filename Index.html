@@ -76,7 +76,7 @@
   </div>
 
 <script>
-  const vendidos = {}; // armazenar compradores
+  let vendidos = JSON.parse(localStorage.getItem('vendidos')) || {}; // carregar salvos
   let numeroSelecionado = null;
 
   const grid = document.getElementById('grid');
@@ -85,7 +85,8 @@
     div.className = 'num';
     div.id = 'num-' + i;
     div.innerText = i;
-    div.onclick = () => selecionarNumero(i);
+    if (vendidos[i]) div.classList.add('vendido');
+    if (!vendidos[i]) div.onclick = () => selecionarNumero(i);
     grid.appendChild(div);
   }
 
@@ -106,6 +107,8 @@
     }
 
     vendidos[numeroSelecionado] = { nome, telefone };
+
+    localStorage.setItem('vendidos', JSON.stringify(vendidos)); // salva
 
     const div = document.getElementById('num-' + numeroSelecionado);
     div.classList.add('vendido');
