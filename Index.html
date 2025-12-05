@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rifa 1 a 100</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f5f5f5;
+    padding: 20px;
+    text-align: center;
+  }
+  h1 {
+    margin-bottom: 20px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 10px;
+    max-width: 500px;
+    margin: auto;
+  }
+  .num {
+    padding: 15px;
+    border-radius: 8px;
+    background: #4caf50;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  .num.vendido {
+    background: #e53935;
+    cursor: not-allowed;
+  }
+  #formBox {
+    margin-top: 20px;
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+    display: none;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+  input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+  button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #1976d2;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <h1>Rifa 1 a 100</h1>
+  <div class="grid" id="grid"></div>
+
+  <div id="formBox">
+    <h3 id="formTitle"></h3>
+    <input type="text" id="nome" placeholder="Nome" />
+    <input type="text" id="telefone" placeholder="Telefone" />
+    <button onclick="confirmarCompra()">Confirmar</button>
+  </div>
+
+<script>
+  const vendidos = {}; // armazenar compradores
+  let numeroSelecionado = null;
+
+  const grid = document.getElementById('grid');
+  for (let i = 1; i <= 100; i++) {
+    const div = document.createElement('div');
+    div.className = 'num';
+    div.id = 'num-' + i;
+    div.innerText = i;
+    div.onclick = () => selecionarNumero(i);
+    grid.appendChild(div);
+  }
+
+  function selecionarNumero(n) {
+    if (vendidos[n]) return;
+    numeroSelecionado = n;
+    document.getElementById('formTitle').innerText = `Comprar número ${n}`;
+    document.getElementById('formBox').style.display = 'block';
+  }
+
+  function confirmarCompra() {
+    const nome = document.getElementById('nome').value;
+    const telefone = document.getElementById('telefone').value;
+
+    if (!nome || !telefone) {
+      alert('Preencha os dados!');
+      return;
+    }
+
+    vendidos[numeroSelecionado] = { nome, telefone };
+
+    const div = document.getElementById('num-' + numeroSelecionado);
+    div.classList.add('vendido');
+    div.onclick = null;
+
+    document.getElementById('nome').value = '';
+    document.getElementById('telefone').value = '';
+    document.getElementById('formBox').style.display = 'none';
+  }
+</script>
+</body>
+</html>
